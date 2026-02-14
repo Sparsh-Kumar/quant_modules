@@ -3,7 +3,7 @@ import os
 from models import OrderbookSnapshot
 
 
-def display_orderbook(orderbook: OrderbookSnapshot, depth: int = 10, symbol: str | None = None) -> None:
+def display_orderbook(orderbook: OrderbookSnapshot, depth: int = 10, symbol: str | None = None, exchange: str | None = None, shm_name: str | None = None) -> None:
   os.system('cls' if os.name == 'nt' else 'clear')
   bids = orderbook.get('bids', [])[:depth]
   asks = orderbook.get('asks', [])[:depth]
@@ -19,8 +19,12 @@ def display_orderbook(orderbook: OrderbookSnapshot, depth: int = 10, symbol: str
     return [format_row(p, a) for p, a in order]
 
   lines = ['']
+  if exchange:
+    lines.append(f'  {exchange}')
   if symbol:
     lines.append(f'  {symbol}')
+  if shm_name:
+    lines.append(f'  shm: {shm_name}')
   lines.extend(['  ASKS', sep, f'  {"Price":>12}  {"Amount":>12}', sep])
   lines.extend(format_levels(asks, reverse=True))
   lines.append(sep)
