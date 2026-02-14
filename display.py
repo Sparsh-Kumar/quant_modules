@@ -35,4 +35,3 @@ def display_orderbook(orderbook: OrderbookSnapshot, depth: int = 10, symbol: str
   lines.append('')
   print('\n'.join(lines))
 
-

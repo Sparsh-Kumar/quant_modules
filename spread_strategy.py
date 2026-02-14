@@ -15,8 +15,6 @@ class SpreadStrategy(StrategyBase):
     a, b = snapshots[0], snapshots[1]
     if not (a.get('asks') and a.get('bids') and b.get('asks') and b.get('bids')):
       return
-    if not (a['asks'] and a['bids'] and b['asks'] and b['bids']):
-      return
     spread = a['asks'][0][0] - b['bids'][0][0]
     print(spread)
 

@@ -5,6 +5,7 @@ from multiprocessing import shared_memory
 VERSION_OFFSET = 0
 SIZE_OFFSET = 8
 PAYLOAD_OFFSET = 12
+PAYLOAD_MAX = 256 * 1024
 
 
 def read_snapshot(shm: shared_memory.SharedMemory) -> dict:
@@ -14,6 +15,8 @@ def read_snapshot(shm: shared_memory.SharedMemory) -> dict:
     if v1 % 2 == 1:
       continue
     size = struct.unpack_from('i', buf, SIZE_OFFSET)[0]
+    if not (0 < size <= PAYLOAD_MAX):
+      continue
     data = bytes(buf[PAYLOAD_OFFSET:PAYLOAD_OFFSET + size])
     v2 = struct.unpack_from('q', buf, VERSION_OFFSET)[0]
     if v1 == v2 and v2 % 2 == 0:

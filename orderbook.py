@@ -7,10 +7,8 @@ import ccxt.pro as ccxtpro
 from display import display_orderbook
 from multiprocessing import shared_memory
 
-from helpers import PAYLOAD_OFFSET, SIZE_OFFSET, VERSION_OFFSET
+from helpers import PAYLOAD_MAX, PAYLOAD_OFFSET, SIZE_OFFSET, VERSION_OFFSET
 from models import OrderbookConfig, OrderbookSnapshot
-
-SHM_PAYLOAD_MAX = 256 * 1024
 
 
 def _parse_args() -> argparse.Namespace:
@@ -34,7 +32,7 @@ class Orderbook:
     self._shm_name = cfg.shm_name or f'orderbook_{cfg.exchange_id}_{cfg.symbol}'
     if cfg.shm_name:
       self._shm = shared_memory.SharedMemory(
-        name=cfg.shm_name, create=True, size=PAYLOAD_OFFSET + SHM_PAYLOAD_MAX,
+        name=cfg.shm_name, create=True, size=PAYLOAD_OFFSET + PAYLOAD_MAX,
       )
     else:
       self._shm = None
@@ -53,7 +51,7 @@ class Orderbook:
     while True:
       ob: OrderbookSnapshot = await self._exchange.watch_order_book(symbol, limit)
       payload = msgpack.packb({'bids': ob['bids'], 'asks': ob['asks'], 'ts': ob['timestamp']})
-      if self._shm and len(payload) <= SHM_PAYLOAD_MAX:
+      if self._shm and len(payload) <= PAYLOAD_MAX:
         self._version += 1
         struct.pack_into('q', self._shm.buf, VERSION_OFFSET, self._version)
         struct.pack_into('i', self._shm.buf, SIZE_OFFSET, len(payload))
