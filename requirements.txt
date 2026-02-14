@@ -1,0 +1,2 @@
+ccxt==4.5.28
+msgpack_python==0.5.6
