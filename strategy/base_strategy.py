@@ -14,7 +14,10 @@ class StrategyBase(ABC):
     self._shms = []
     for n in self._shm_names:
       try:
-        self._shms.append(shared_memory.SharedMemory(name=n))
+        try:
+          self._shms.append(shared_memory.SharedMemory(name=n, track=False))
+        except TypeError:
+          self._shms.append(shared_memory.SharedMemory(name=n))
       except FileNotFoundError:
         raise SystemExit(
           f"Shared memory '{n}' not found.\n"

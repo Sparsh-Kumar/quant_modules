@@ -1,4 +1,5 @@
 import os
+import time
 
 from models import OrderbookSnapshot
 
@@ -30,7 +31,9 @@ def display_orderbook(orderbook: OrderbookSnapshot, depth: int = 10, symbol: str
   lines.append(sep)
   lines.extend(format_levels(bids))
   lines.extend([sep, '  BIDS'])
-  if ts:
-    lines.append(f'  (updated: {ts})')
+  if ts is not None:
+    ts_ms = int(ts) if ts > 1e12 else int(ts * 1000)
+    delay_ms = int(time.time() * 1000) - ts_ms
+    lines.append(f'  (updated: {ts} ; delay: {delay_ms} ms)')
   lines.append('')
   print('\n'.join(lines))
