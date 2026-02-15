@@ -1,6 +1,6 @@
 import argparse
 
-from base_strategy import StrategyBase
+from strategy.base_strategy import StrategyBase
 
 
 def _parse_args() -> argparse.Namespace:
@@ -15,8 +15,10 @@ class SpreadStrategy(StrategyBase):
     a, b = snapshots[0], snapshots[1]
     if not (a.get('asks') and a.get('bids') and b.get('asks') and b.get('bids')):
       return
-    spread = a['asks'][0][0] - b['bids'][0][0]
-    print(spread)
+    best_ask_a = a['asks'][0][0]
+    best_bid_b = b['bids'][0][0]
+    spread = best_ask_a - best_bid_b
+    print(f'best_ask_a: {best_ask_a}, best_bid_b: {best_bid_b}, spread: {spread}')
 
 
 if __name__ == '__main__':
@@ -24,4 +26,3 @@ if __name__ == '__main__':
   if len(args.shm) < 2:
     raise SystemExit('At least 2 shared memory names required.')
   SpreadStrategy(args.shm).run()
-

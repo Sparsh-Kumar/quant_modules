@@ -19,7 +19,7 @@ class StrategyBase(ABC):
         raise SystemExit(
           f"Shared memory '{n}' not found.\n"
           f"1) Start the orderbook writer and keep it running (use the exact name):\n"
-          f"   python -m orderbook -e <exchange> -s <symbol> --shm-name {n} --no-display\n"
+          f"   python -m orderbook.orderbook -e <exchange> -s <symbol> --shm-name {n} --no-display\n"
           f"2) Run the strategy only while the writer(s) are still running.\n"
           f"3) On macOS: run all commands from the same directory (e.g. quant_modules) and the same venv."
         ) from None

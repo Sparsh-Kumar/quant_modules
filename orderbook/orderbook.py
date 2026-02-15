@@ -4,11 +4,12 @@ import struct
 import sys
 import msgpack
 import ccxt.pro as ccxtpro
-from display import display_orderbook
 from multiprocessing import shared_memory
 
 from helpers import PAYLOAD_MAX, PAYLOAD_OFFSET, SIZE_OFFSET, VERSION_OFFSET
 from models import OrderbookConfig, OrderbookSnapshot
+
+from .display import display_orderbook
 
 
 def _parse_args() -> argparse.Namespace:
@@ -21,6 +22,25 @@ def _parse_args() -> argparse.Namespace:
   return p.parse_args()
 
 
+async def run() -> None:
+  args = _parse_args()
+  orderbook = Orderbook(config=OrderbookConfig(
+    exchange_id=args.exchange, symbol=args.symbol, limit=args.limit,
+    shm_name=args.shm_name,
+    display=not args.no_display,
+  ))
+  if args.shm_name:
+    actual = orderbook._shm.name if orderbook._shm else args.shm_name
+    print('Shared memory name:', actual, file=sys.stderr)
+    print('Read with: python -m strategy.spread_strategy -s', actual, file=sys.stderr)
+  try:
+    await orderbook.stream_orderbook()
+  except (asyncio.CancelledError, KeyboardInterrupt):
+    pass
+  finally:
+    await orderbook.close()
+
+
 class Orderbook:
 
   def __init__(self, config: OrderbookConfig | None = None, **kwargs: object) -> None:
@@ -28,7 +48,7 @@ class Orderbook:
     self._exchange_id, self._symbol, self._limit = cfg.exchange_id, cfg.symbol, cfg.limit
     if not self._exchange_id:
       raise ValueError('exchange_id is required.')
-    self._exchange = (getattr(ccxtpro, self._exchange_id))()
+    self._exchange = (getattr(ccxtpro, self._exchange_id))({'timeout': 30000})
     self._shm_name = cfg.shm_name or f'orderbook_{cfg.exchange_id}_{cfg.symbol}'
     if cfg.shm_name:
       self._shm = shared_memory.SharedMemory(
@@ -66,22 +86,8 @@ class Orderbook:
         )
 
 
-async def _run() -> None:
-  args = _parse_args()
-  orderbook = Orderbook(config=OrderbookConfig(
-    exchange_id=args.exchange, symbol=args.symbol, limit=args.limit,
-    shm_name=args.shm_name,
-    display=not args.no_display,
-  ))
-  if args.shm_name:
-    actual = orderbook._shm.name if orderbook._shm else args.shm_name
-    print('Shared memory name:', actual, file=sys.stderr)
-    print('Read with: python -m spread_strategy -s', actual, file=sys.stderr)
-  try:
-    await orderbook.stream_orderbook()
-  finally:
-    await orderbook.close()
-
-
 if __name__ == '__main__':
-  asyncio.run(_run())
+  try:
+    asyncio.run(run())
+  except KeyboardInterrupt:
+    pass
