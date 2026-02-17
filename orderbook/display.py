@@ -3,6 +3,9 @@ import time
 
 from models import OrderbookSnapshot
 
+_delay_sum: int = 0
+_delay_count: int = 0
+
 
 def display_orderbook(orderbook: OrderbookSnapshot, depth: int = 10, symbol: str | None = None, exchange: str | None = None, shm_name: str | None = None) -> None:
   os.system('cls' if os.name == 'nt' else 'clear')
@@ -32,8 +35,12 @@ def display_orderbook(orderbook: OrderbookSnapshot, depth: int = 10, symbol: str
   lines.extend(format_levels(bids))
   lines.extend([sep, '  BIDS'])
   if ts is not None:
+    global _delay_sum, _delay_count
     ts_ms = int(ts) if ts > 1e12 else int(ts * 1000)
     delay_ms = int(time.time() * 1000) - ts_ms
-    lines.append(f'  (updated: {ts} ; delay: {delay_ms} ms)')
+    _delay_sum += delay_ms
+    _delay_count += 1
+    latency_ms = _delay_sum // _delay_count
+    lines.append(f'  (updated: {ts} ; delay: {delay_ms} ms ; latency: {latency_ms} ms)')
   lines.append('')
   print('\n'.join(lines))
