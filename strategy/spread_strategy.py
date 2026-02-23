@@ -26,9 +26,12 @@ class SpreadStrategy(StrategyBase):
     spread = mid_a - mid_b
     print(f'mid_a: {mid_a}, mid_b: {mid_b}, spread: {spread}')
     if not self._market_orders_sent:
-      # Perp futures: Binance USDⓈ-M (fapi), Bybit linear (USDT-margined perp)
+      best_ask_a = a['asks'][0][0]
+      best_bid_b = b['bids'][0][0]
+      print(f'Sending BUY (Binance) at ref price {best_ask_a}')
+      print(f'Sending SELL (Bybit) at ref price {best_bid_b}')
       write_binance_order({'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': '0.001'})
-      write_bybit_order({'symbol': 'BTCUSDT', 'side': 'Buy', 'orderType': 'Market', 'qty': '0.001', 'category': 'linear'})
+      write_bybit_order({'symbol': 'BTCUSDT', 'side': 'Sell', 'orderType': 'Market', 'qty': '0.001', 'category': 'linear'})
       self._market_orders_sent = True
 
 
