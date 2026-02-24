@@ -320,7 +320,10 @@ def write_order_request(order: dict, shm_name: str = _ORDER_SHM_NAME) -> None:
   payload = msgpack.packb(order)
   if len(payload) > PAYLOAD_MAX:
     raise ValueError(f"Order payload exceeds {PAYLOAD_MAX} bytes")
-  shm = shared_memory.SharedMemory(name=shm_name, create=False)
+  try:
+    shm = shared_memory.SharedMemory(name=shm_name, create=False, track=False)
+  except TypeError:
+    shm = shared_memory.SharedMemory(name=shm_name, create=False)
   try:
     struct.pack_into("q", shm.buf, VERSION_OFFSET, 1)
     struct.pack_into("i", shm.buf, SIZE_OFFSET, len(payload))
@@ -339,7 +342,10 @@ def run_order_reader(shm_name: str = _ORDER_SHM_NAME) -> None:
   try:
     shm = shared_memory.SharedMemory(name=shm_name, create=True, size=PAYLOAD_OFFSET + PAYLOAD_MAX)
   except FileExistsError:
-    shm = shared_memory.SharedMemory(name=shm_name, create=False)
+    try:
+      shm = shared_memory.SharedMemory(name=shm_name, create=False, track=False)
+    except TypeError:
+      shm = shared_memory.SharedMemory(name=shm_name, create=False)
   _clear_order_shm(shm)
   client = BinanceFuturesWSClient()
   client.connect()

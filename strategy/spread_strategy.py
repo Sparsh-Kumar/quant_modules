@@ -1,5 +1,6 @@
 import argparse
 import logging
+import sys
 
 from binance_ws_orders import write_order_request as write_binance_order
 from bybit_ws_orders import write_order_request as write_bybit_order
@@ -30,6 +31,12 @@ class SpreadStrategy(StrategyBase):
       super().run()
     except _OrdersSent as e:
       logger.info('Exiting after sending orders: %s', e)
+      for shm in self._shms:
+        try:
+          shm.close()
+        except Exception:
+          pass
+      sys.exit(0)
 
   def on_snapshots(self, snapshots: list[dict]) -> None:
     a, b = snapshots[0], snapshots[1]
