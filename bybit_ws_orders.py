@@ -301,6 +301,7 @@ def run_order_reader(shm_name: str = _ORDER_SHM_NAME) -> None:
       reduce_only = order.get("reduceOnly", order.get("reduce_only", False))
       position_idx = order.get("positionIdx", order.get("position_idx"))
       order_link_id = order.get("orderLinkId", order.get("order_link_id"))
+      print(f"Order from shm: {order_type} {side} {symbol} qty={qty_str}", flush=True)
       try:
         if order_type == "MARKET":
           client.place_market_order(
@@ -324,8 +325,8 @@ def run_order_reader(shm_name: str = _ORDER_SHM_NAME) -> None:
             order_link_id=order_link_id,
           )
         _clear_order_shm(shm)
-      except Exception:
-        pass
+      except Exception as e:
+        print(f"Bybit order failed: {e}", flush=True)
       time.sleep(0.05)
   finally:
     client.close()

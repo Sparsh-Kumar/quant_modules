@@ -366,6 +366,7 @@ def run_order_reader(shm_name: str = _ORDER_SHM_NAME) -> None:
       reduce_only = order.get("reduce_only", False)
       position_side = order.get("position_side")
       client_order_id = order.get("new_client_order_id")
+      print(f"Order from shm: {order_type} {side} {symbol} qty={qty}", flush=True)
       try:
         if order_type == "MARKET":
           client.place_market_order(
@@ -387,8 +388,8 @@ def run_order_reader(shm_name: str = _ORDER_SHM_NAME) -> None:
             new_client_order_id=client_order_id,
           )
         _clear_order_shm(shm)
-      except Exception:
-        pass
+      except Exception as e:
+        print(f"Binance order failed: {e}", flush=True)
       time.sleep(0.05)
   finally:
     client.close()
