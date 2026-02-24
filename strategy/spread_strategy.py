@@ -63,8 +63,8 @@ class SpreadStrategy(StrategyBase):
       print('  python -m binance_ws_orders')
       print('  python -m bybit_ws_orders')
       print(f'BUY ref {best_ask_a} | SELL ref {best_bid_b}')
-      write_binance_order({'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': '0.001'})
-      write_bybit_order({'symbol': 'BTCUSDT', 'side': 'Sell', 'orderType': 'Market', 'qty': '0.001', 'category': 'linear'})
+      write_binance_order({'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': '0.002'})
+      write_bybit_order({'symbol': 'BTCUSDT', 'side': 'Sell', 'orderType': 'Market', 'qty': '0.002', 'category': 'linear'})
       self._market_orders_sent = True
       raise _OrdersSent('Orders sent.')
 

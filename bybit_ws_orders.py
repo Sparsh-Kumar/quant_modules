@@ -269,8 +269,9 @@ def write_order_request(order: dict, shm_name: str = _ORDER_SHM_NAME) -> None:
 
 def run_order_reader(shm_name: str = _ORDER_SHM_NAME) -> None:
   """
-  Open Bybit WebSocket, read from shm continuously; when an order appears, send it and clear.
+  Keep a WebSocket connection to Bybit open; read from shm and send orders.
   Run as a separate process; use write_order_request() from elsewhere to submit orders.
+  Clears each order from shm after one attempt (success or failure).
   """
   try:
     shm = shared_memory.SharedMemory(name=shm_name, create=True, size=PAYLOAD_OFFSET + PAYLOAD_MAX)
@@ -282,6 +283,7 @@ def run_order_reader(shm_name: str = _ORDER_SHM_NAME) -> None:
   _clear_order_shm(shm)
   client = BybitFuturesWSClient()
   client.connect()
+  print("Connected to Bybit; polling shm 'bybit_order'.", flush=True)
   try:
     while True:
       order = _read_order_from_shm(shm)
@@ -324,9 +326,10 @@ def run_order_reader(shm_name: str = _ORDER_SHM_NAME) -> None:
             position_idx=position_idx,
             order_link_id=order_link_id,
           )
-        _clear_order_shm(shm)
       except Exception as e:
         print(f"Bybit order failed: {e}", flush=True)
+      finally:
+        _clear_order_shm(shm)
       time.sleep(0.05)
   finally:
     client.close()

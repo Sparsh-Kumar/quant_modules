@@ -335,9 +335,10 @@ def write_order_request(order: dict, shm_name: str = _ORDER_SHM_NAME) -> None:
 
 def run_order_reader(shm_name: str = _ORDER_SHM_NAME) -> None:
   """
-  Open Binance WebSocket connection and read from shm continuously.
-  When an order appears in shm, send it to Binance and clear the shm.
+  Keep a WebSocket connection to Binance open; read from shm and send orders.
   Run as a separate process; use write_order_request() from elsewhere to submit orders.
+  Clears each order from shm after one attempt (success or failure).
+  Reconnects automatically if the socket is closed (e.g. idle timeout).
   """
   try:
     shm = shared_memory.SharedMemory(name=shm_name, create=True, size=PAYLOAD_OFFSET + PAYLOAD_MAX)
@@ -349,6 +350,7 @@ def run_order_reader(shm_name: str = _ORDER_SHM_NAME) -> None:
   _clear_order_shm(shm)
   client = BinanceFuturesWSClient()
   client.connect()
+  print("Connected to Binance; polling shm 'binance_order'.", flush=True)
   try:
     while True:
       order = _read_order_from_shm(shm)
@@ -387,9 +389,18 @@ def run_order_reader(shm_name: str = _ORDER_SHM_NAME) -> None:
             position_side=position_side,
             new_client_order_id=client_order_id,
           )
-        _clear_order_shm(shm)
       except Exception as e:
         print(f"Binance order failed: {e}", flush=True)
+        if "closed" in str(e).lower():
+          try:
+            client.close()
+          except Exception:
+            pass
+          client = BinanceFuturesWSClient()
+          client.connect()
+          print("Reconnected to Binance.", flush=True)
+      finally:
+        _clear_order_shm(shm)
       time.sleep(0.05)
   finally:
     client.close()
