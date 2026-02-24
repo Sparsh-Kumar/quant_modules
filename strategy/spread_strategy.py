@@ -34,6 +34,7 @@ class SpreadStrategy(StrategyBase):
   def __init__(self, shm_names: list[str]) -> None:
     super().__init__(shm_names)
     self._market_orders_sent = False
+    self._index = 0
 
   def run(self) -> None:
     try:
@@ -54,8 +55,8 @@ class SpreadStrategy(StrategyBase):
     mid_a = (a['bids'][0][0] + a['asks'][0][0]) / 2
     mid_b = (b['bids'][0][0] + b['asks'][0][0]) / 2
     spread = mid_a - mid_b
-    print(f'mid_a: {mid_a}, mid_b: {mid_b}, spread: {spread}')
-    if not self._market_orders_sent:
+    print(f'index: {self._index}, mid_a: {mid_a}, mid_b: {mid_b}, spread: {spread}')
+    if not self._market_orders_sent and self._index == 70:
       best_ask_a = a['asks'][0][0]
       best_bid_b = b['bids'][0][0]
       print('Order requests written to shm (Binance BUY, Bybit SELL).')
@@ -67,6 +68,7 @@ class SpreadStrategy(StrategyBase):
       write_bybit_order({'symbol': 'BTCUSDT', 'side': 'Sell', 'orderType': 'Market', 'qty': '0.002', 'category': 'linear'})
       self._market_orders_sent = True
       raise _OrdersSent('Orders sent.')
+    self._index += 1
 
 
 if __name__ == '__main__':
