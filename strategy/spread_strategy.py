@@ -1,4 +1,5 @@
 import argparse
+import logging
 
 from binance_ws_orders import write_order_request as write_binance_order
 from bybit_ws_orders import write_order_request as write_bybit_order
@@ -11,11 +12,24 @@ def _parse_args() -> argparse.Namespace:
   return p.parse_args()
 
 
+logger = logging.getLogger(__name__)
+
+
+class _OrdersSent(Exception):
+  pass
+
+
 class SpreadStrategy(StrategyBase):
 
   def __init__(self, shm_names: list[str]) -> None:
     super().__init__(shm_names)
     self._market_orders_sent = False
+
+  def run(self) -> None:
+    try:
+      super().run()
+    except _OrdersSent as e:
+      logger.info('Exiting after sending orders: %s', e)
 
   def on_snapshots(self, snapshots: list[dict]) -> None:
     a, b = snapshots[0], snapshots[1]
@@ -33,6 +47,7 @@ class SpreadStrategy(StrategyBase):
       write_binance_order({'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': '0.001'})
       write_bybit_order({'symbol': 'BTCUSDT', 'side': 'Sell', 'orderType': 'Market', 'qty': '0.001', 'category': 'linear'})
       self._market_orders_sent = True
+      raise _OrdersSent('Orders sent.')
 
 
 if __name__ == '__main__':
