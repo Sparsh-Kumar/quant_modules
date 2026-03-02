@@ -45,6 +45,7 @@ def _setup_logging(log_file: str) -> None:
 
 _PROFIT_THRESHOLD = 0.05 * 4  # spread_pct must be > this (0.2) to be profitable
 _ENTRY_SLIPPAGE_PCT = 0.02  # assume 0.02% worse fill when recording entry prices
+_COMMISSION_PCT = 0.05  # 0.05% per order (4 orders per round trip: 2 entry + 2 exit)
 
 
 def _mean_and_stdev(values: deque[float]) -> tuple[float, float]:
@@ -110,19 +111,22 @@ class SpreadStrategy(StrategyBase):
         exchange_1_net = exit_price_binance - self._entry_price_binance
         exchange_2_net = self._entry_price_bybit - exit_price_bybit
       net_value = exchange_1_net + exchange_2_net
-      if net_value > 0:
+      # Commission: 0.05% per order × 4 orders (entry binance, entry bybit, exit binance, exit bybit)
+      total_commission = (self._entry_price_binance + self._entry_price_bybit + exit_price_binance + exit_price_bybit) * (_COMMISSION_PCT / 100)
+      net_after_commission = net_value - total_commission
+      if net_after_commission > 0:
         qty = '0.002'
         if self._position_direction == 1:
           write_binance_order({'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': qty})
           write_bybit_order({'symbol': 'BTCUSDT', 'side': 'Sell', 'orderType': 'Market', 'qty': qty, 'category': 'linear'})
-          line = f'Close: Binance BUY @ {exit_price_binance}, Bybit SELL @ {exit_price_bybit} | ex1_net={exchange_1_net} ex2_net={exchange_2_net} net_value={net_value}'
+          line = f'Close: Binance BUY @ {exit_price_binance}, Bybit SELL @ {exit_price_bybit} | ex1_net={exchange_1_net} ex2_net={exchange_2_net} net_value={net_value} commission={total_commission:.2f} net_after_comm={net_after_commission:.2f}'
         else:
           write_binance_order({'symbol': 'BTCUSDT', 'side': 'SELL', 'type': 'MARKET', 'quantity': qty})
           write_bybit_order({'symbol': 'BTCUSDT', 'side': 'Buy', 'orderType': 'Market', 'qty': qty, 'category': 'linear'})
-          line = f'Close: Binance SELL @ {exit_price_binance}, Bybit BUY @ {exit_price_bybit} | ex1_net={exchange_1_net} ex2_net={exchange_2_net} net_value={net_value}'
+          line = f'Close: Binance SELL @ {exit_price_binance}, Bybit BUY @ {exit_price_bybit} | ex1_net={exchange_1_net} ex2_net={exchange_2_net} net_value={net_value} commission={total_commission:.2f} net_after_comm={net_after_commission:.2f}'
         logger.info(line)
         raise _OrdersSent('Position closed.')  # one trade done → exit program
-      logger.info(f'Position open | ex1_net={exchange_1_net} ex2_net={exchange_2_net} net_value={net_value} (waiting for >0)')
+      logger.info(f'Position open | ex1_net={exchange_1_net} ex2_net={exchange_2_net} net_value={net_value} commission={total_commission:.2f} net_after_comm={net_after_commission:.2f} (waiting for >0)')
       return
 
     # No position: run entry logic (spread history, z-score, maybe open).
