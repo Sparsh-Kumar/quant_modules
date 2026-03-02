@@ -86,19 +86,20 @@ class SpreadStrategy(StrategyBase):
     z_score = (spread - statistics.mean(self._spreads)) / stdev if stdev > 0 else 0.0
     latency_ms = (time.perf_counter() - t0) * 1000
     line = f'index={self._index} mid_a={mid_a} mid_b={mid_b} spread={spread} z_score={z_score} latency_ms={latency_ms:.3f}'
-    if abs(z_score) >= 2:
+    if abs(z_score) >= 4:
       best_bid_a, best_ask_a = a['bids'][0][0], a['asks'][0][0]
       best_bid_b, best_ask_b = b['bids'][0][0], b['asks'][0][0]
-      if z_score > 0:
-        real_spread = best_bid_a - best_ask_b
-        buy_price = best_ask_b
-      else:
-        real_spread = best_bid_b - best_ask_a
-        buy_price = best_ask_a
-      spread_pct = (real_spread / buy_price) * 100 if buy_price > 0 else 0.0
-      profitable = spread_pct > _PROFIT_THRESHOLD
-      line += f' | spread_pct={spread_pct:.4f}% threshold={_PROFIT_THRESHOLD} profitable={profitable}'
-      if profitable and not self._market_orders_sent:
+      # if z_score > 0:
+      #   real_spread = best_bid_a - best_ask_b
+      #   buy_price = best_ask_b
+      # else:
+      #   real_spread = best_bid_b - best_ask_a
+      #   buy_price = best_ask_a
+      # spread_pct = (real_spread / buy_price) * 100 if buy_price > 0 else 0.0
+      # profitable = spread_pct > _PROFIT_THRESHOLD
+      # line += f' | spread_pct={spread_pct:.4f}% threshold={_PROFIT_THRESHOLD} profitable={profitable}'
+      # Enter based on spread (|z|) only; profitability check commented out.
+      if not self._market_orders_sent:
         qty = '0.002'
         if z_score > 0:  # spread high → short Binance, long Bybit (mean revert down)
           line += f' | Orders: Binance SELL @ {best_bid_a} (short), Bybit BUY @ {best_ask_b} (long)'
