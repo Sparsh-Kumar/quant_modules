@@ -44,6 +44,7 @@ def _setup_logging(log_file: str) -> None:
   logger.addHandler(sh)
 
 _PROFIT_THRESHOLD = 0.05 * 4  # spread_pct must be > this (0.2) to be profitable
+_ENTRY_SLIPPAGE_PCT = 0.02  # assume 0.02% worse fill when recording entry prices
 
 
 def _mean_and_stdev(values: deque[float]) -> tuple[float, float]:
@@ -154,15 +155,16 @@ class SpreadStrategy(StrategyBase):
           write_binance_order({'symbol': 'BTCUSDT', 'side': 'SELL', 'type': 'MARKET', 'quantity': qty})
           write_bybit_order({'symbol': 'BTCUSDT', 'side': 'Buy', 'orderType': 'Market', 'qty': qty, 'category': 'linear'})
           self._position_direction = 1
-          self._entry_price_binance = best_bid_a
-          self._entry_price_bybit = best_ask_b
+          # Slippage: sell fills worse (receive less), buy fills worse (pay more)
+          self._entry_price_binance = best_bid_a * (1 - _ENTRY_SLIPPAGE_PCT / 100)
+          self._entry_price_bybit = best_ask_b * (1 + _ENTRY_SLIPPAGE_PCT / 100)
         else:  # spread low → long Binance, short Bybit (mean revert up)
           line += f' | Orders: Binance BUY @ {best_ask_a} (long), Bybit SELL @ {best_bid_b} (short)'
           write_binance_order({'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': qty})
           write_bybit_order({'symbol': 'BTCUSDT', 'side': 'Sell', 'orderType': 'Market', 'qty': qty, 'category': 'linear'})
           self._position_direction = -1
-          self._entry_price_binance = best_ask_a
-          self._entry_price_bybit = best_bid_b
+          self._entry_price_binance = best_ask_a * (1 + _ENTRY_SLIPPAGE_PCT / 100)
+          self._entry_price_bybit = best_bid_b * (1 - _ENTRY_SLIPPAGE_PCT / 100)
         self._market_orders_sent = True
         logger.info(line)
         # Do not exit; keep running to monitor for profitable close.
