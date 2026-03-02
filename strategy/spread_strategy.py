@@ -9,7 +9,7 @@ To get orders sent to exchanges:
 """
 import argparse
 import logging
-import statistics
+import math
 import sys
 import time
 from collections import deque
@@ -44,6 +44,22 @@ def _setup_logging(log_file: str) -> None:
   logger.addHandler(sh)
 
 _PROFIT_THRESHOLD = 0.05 * 4  # spread_pct must be > this (0.2) to be profitable
+
+
+def _mean_and_stdev(values: deque[float]) -> tuple[float, float]:
+  """Single-pass mean and sample stdev over values. Returns (mean, stdev); stdev=0 if n<2."""
+  n = len(values)
+  if n < 2:
+    return (values[0], 0.0) if n == 1 else (0.0, 0.0)
+  sum_x = 0.0
+  sum_x2 = 0.0
+  for x in values:
+    sum_x += x
+    sum_x2 += x * x
+  mean = sum_x / n
+  variance = (sum_x2 - sum_x * sum_x / n) / (n - 1)
+  stdev = math.sqrt(variance) if variance > 0 else 0.0
+  return mean, stdev
 
 
 class _OrdersSent(Exception):
@@ -82,8 +98,8 @@ class SpreadStrategy(StrategyBase):
     if len(self._spreads) < 2000:
       return
     t0 = time.perf_counter()
-    stdev = statistics.stdev(self._spreads)
-    z_score = (spread - statistics.mean(self._spreads)) / stdev if stdev > 0 else 0.0
+    mean, stdev = _mean_and_stdev(self._spreads)
+    z_score = (spread - mean) / stdev if stdev > 0 else 0.0
     latency_ms = (time.perf_counter() - t0) * 1000
     line = f'index={self._index} mid_a={mid_a} mid_b={mid_b} spread={spread} z_score={z_score} latency_ms={latency_ms:.3f}'
     if abs(z_score) >= 4:
