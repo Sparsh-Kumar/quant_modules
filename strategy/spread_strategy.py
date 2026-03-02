@@ -137,7 +137,7 @@ class SpreadStrategy(StrategyBase):
     z_score = (spread - mean) / stdev if stdev > 0 else 0.0
     latency_ms = (time.perf_counter() - t0) * 1000
     line = f'index={self._index} mid_a={mid_a} mid_b={mid_b} spread={spread} z_score={z_score} latency_ms={latency_ms:.3f}'
-    if abs(z_score) >= 4:
+    if abs(z_score) >= 5:
       # if z_score > 0:
       #   real_spread = best_bid_a - best_ask_b
       #   buy_price = best_ask_b
