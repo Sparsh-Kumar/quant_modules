@@ -68,7 +68,7 @@ class SpreadStrategy(StrategyBase):
           shm.close()
         except Exception:
           pass
-      sys.exit(0)
+      sys.exit(0)  # exit immediately after order is punched
 
   def on_snapshots(self, snapshots: list[dict]) -> None:
     binance_book, bybit_book = snapshots[0], snapshots[1]
@@ -109,9 +109,9 @@ class SpreadStrategy(StrategyBase):
           write_binance_order({'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': qty})
           write_bybit_order({'symbol': 'BTCUSDT', 'side': 'Sell', 'orderType': 'Market', 'qty': qty, 'category': 'linear'})
         self._market_orders_sent = True
-        logger.info(line)
+        logger.info(line)  # log to file only when order is punched
         raise _OrdersSent('Orders sent.')
-    logger.info(line)
+    print(line, flush=True)  # console only; file grows only on order
     self._index += 1
 
 
