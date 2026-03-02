@@ -45,7 +45,8 @@ def _setup_logging(log_file: str) -> None:
 
 _PROFIT_THRESHOLD = 0.05 * 4  # spread_pct must be > this (0.2) to be profitable
 _ENTRY_SLIPPAGE_PCT = 0.02  # assume 0.02% worse fill when recording entry prices
-_COMMISSION_PCT = 0.05  # 0.05% per order (4 orders per round trip: 2 entry + 2 exit)
+_COMMISSION_PCT = 0.05  # 0.05% per order (taker); 4 orders round-trip
+QTY_BTC = 0.002  # position size; P&L/commission * QTY_BTC = actual USD
 
 
 def _mean_and_stdev(values: deque[float]) -> tuple[float, float]:
@@ -92,6 +93,7 @@ class SpreadStrategy(StrategyBase):
       sys.exit(0)  # exit after one complete trade (entry + exit)
 
   def on_snapshots(self, snapshots: list[dict]) -> None:
+    self._index += 1
     binance_book, bybit_book = snapshots[0], snapshots[1]
     a, b = binance_book, bybit_book
     if not (a.get('asks') and a.get('bids') and b.get('asks') and b.get('bids')):
@@ -111,22 +113,24 @@ class SpreadStrategy(StrategyBase):
         exchange_1_net = exit_price_binance - self._entry_price_binance
         exchange_2_net = self._entry_price_bybit - exit_price_bybit
       net_value = exchange_1_net + exchange_2_net
-      # Commission: 0.05% per order × 4 orders (entry binance, entry bybit, exit binance, exit bybit)
       total_commission = (self._entry_price_binance + self._entry_price_bybit + exit_price_binance + exit_price_bybit) * (_COMMISSION_PCT / 100)
       net_after_commission = net_value - total_commission
+      net_value_usd = net_value * QTY_BTC
+      commission_usd = total_commission * QTY_BTC
+      net_after_usd = net_after_commission * QTY_BTC
       if net_after_commission > 0:
-        qty = '0.002'
+        qty = f'{QTY_BTC:.4f}'.rstrip('0').rstrip('.')
         if self._position_direction == 1:
           write_binance_order({'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': qty})
           write_bybit_order({'symbol': 'BTCUSDT', 'side': 'Sell', 'orderType': 'Market', 'qty': qty, 'category': 'linear'})
-          line = f'Close: Binance BUY @ {exit_price_binance}, Bybit SELL @ {exit_price_bybit} | ex1_net={exchange_1_net} ex2_net={exchange_2_net} net_value={net_value} commission={total_commission:.2f} net_after_comm={net_after_commission:.2f}'
+          line = f'Close: Binance BUY @ {exit_price_binance}, Bybit SELL @ {exit_price_bybit} | net_value_usd={net_value_usd:.4f} commission_usd={commission_usd:.4f} net_after_usd={net_after_usd:.4f}'
         else:
           write_binance_order({'symbol': 'BTCUSDT', 'side': 'SELL', 'type': 'MARKET', 'quantity': qty})
           write_bybit_order({'symbol': 'BTCUSDT', 'side': 'Buy', 'orderType': 'Market', 'qty': qty, 'category': 'linear'})
-          line = f'Close: Binance SELL @ {exit_price_binance}, Bybit BUY @ {exit_price_bybit} | ex1_net={exchange_1_net} ex2_net={exchange_2_net} net_value={net_value} commission={total_commission:.2f} net_after_comm={net_after_commission:.2f}'
+          line = f'Close: Binance SELL @ {exit_price_binance}, Bybit BUY @ {exit_price_bybit} | net_value_usd={net_value_usd:.4f} commission_usd={commission_usd:.4f} net_after_usd={net_after_usd:.4f}'
         logger.info(line)
         raise _OrdersSent('Position closed.')  # one trade done → exit program
-      logger.info(f'Position open | ex1_net={exchange_1_net} ex2_net={exchange_2_net} net_value={net_value} commission={total_commission:.2f} net_after_comm={net_after_commission:.2f} (waiting for >0)')
+      logger.info(f'Position open | net_value_usd={net_value_usd:.4f} commission_usd={commission_usd:.4f} net_after_usd={net_after_usd:.4f} (waiting for net_after_usd>0)')
       return
 
     # No position: run entry logic (spread history, z-score, maybe open).
@@ -142,18 +146,18 @@ class SpreadStrategy(StrategyBase):
     latency_ms = (time.perf_counter() - t0) * 1000
     line = f'index={self._index} mid_a={mid_a} mid_b={mid_b} spread={spread} z_score={z_score} latency_ms={latency_ms:.3f}'
     if abs(z_score) >= 5:
-      # if z_score > 0:
-      #   real_spread = best_bid_a - best_ask_b
-      #   buy_price = best_ask_b
-      # else:
-      #   real_spread = best_bid_b - best_ask_a
-      #   buy_price = best_ask_a
-      # spread_pct = (real_spread / buy_price) * 100 if buy_price > 0 else 0.0
-      # profitable = spread_pct > _PROFIT_THRESHOLD
-      # line += f' | spread_pct={spread_pct:.4f}% threshold={_PROFIT_THRESHOLD} profitable={profitable}'
-      # Enter based on spread (|z|) only; profitability check commented out.
-      if not self._market_orders_sent:
-        qty = '0.002'
+      if z_score > 0:
+        real_spread = best_bid_a - best_ask_b
+        buy_price = best_ask_b
+      else:
+        real_spread = best_bid_b - best_ask_a
+        buy_price = best_ask_a
+      spread_pct = (real_spread / buy_price) * 100 if buy_price > 0 else 0.0
+      profitable = spread_pct > _PROFIT_THRESHOLD
+      line += f' | spread_pct={spread_pct:.4f}% threshold={_PROFIT_THRESHOLD} profitable={profitable}'
+      # Enter only when spread is extreme (|z| >= 5) and executable spread exceeds cost threshold.
+      if not self._market_orders_sent and profitable:
+        qty = f'{QTY_BTC:.4f}'.rstrip('0').rstrip('.')
         if z_score > 0:  # spread high → short Binance, long Bybit (mean revert down)
           line += f' | Orders: Binance SELL @ {best_bid_a} (short), Bybit BUY @ {best_ask_b} (long)'
           write_binance_order({'symbol': 'BTCUSDT', 'side': 'SELL', 'type': 'MARKET', 'quantity': qty})
@@ -176,7 +180,6 @@ class SpreadStrategy(StrategyBase):
         print(line, flush=True)
     else:
       print(line, flush=True)
-    self._index += 1
 
 
 if __name__ == '__main__':
